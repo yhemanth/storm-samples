@@ -1,4 +1,5 @@
-import storm
+import sys;
+import storm;
 
 class SentenceSplitterBolt(storm.BasicBolt):
     def process(self, tup):
@@ -6,4 +7,5 @@ class SentenceSplitterBolt(storm.BasicBolt):
         for word in words:
           storm.emit(["yh-mine:"+word])
 
-SentenceSplitterBolt().run()
+
+SentenceSplitterBolt().run();

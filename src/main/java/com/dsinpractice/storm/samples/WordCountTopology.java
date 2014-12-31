@@ -23,7 +23,7 @@ public class WordCountTopology {
     public static class SplitSentence extends ShellBolt implements IRichBolt {
 
         public SplitSentence() {
-            super("python", "sentencesplitter.py");
+            super("sh", "call_sentencesplitter.sh");
         }
 
         @Override
