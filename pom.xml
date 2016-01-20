@@ -21,8 +21,8 @@
         </repository>
         <repository>
             <id>hortonworks.repo</id>
-            <url>http://nexus-private.hortonworks.com/nexus/content/groups/public/</url>
-            <name>Hortonworks Repo</name>
+            <url>http://repo.hortonworks.com/content/repositories/releases</url>
+            <name>Hortonworks Public Repository</name>
             <releases>
                 <enabled>true</enabled>
             </releases>
@@ -30,31 +30,42 @@
                 <enabled>false</enabled>
             </snapshots>
         </repository>
+        <repository>
+            <id>HortonworksJettyHadoop</id>
+            <name>HDP Jetty</name>
+            <url>http://repo.hortonworks.com/content/repositories/jetty-hadoop</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+        </repository>
     </repositories>
 
   <dependencies>
       <dependency>
           <groupId>org.apache.storm</groupId>
           <artifactId>storm-core</artifactId>
-          <version>0.10.0-SNAPSHOT</version>
+          <version>0.10.0.2.3.99.0-195</version>
           <!-- keep storm out of the jar-with-dependencies -->
           <scope>provided</scope>
       </dependency>
       <dependency>
           <groupId>org.apache.storm</groupId>
           <artifactId>storm-kafka</artifactId>
-          <version>0.10.0-SNAPSHOT</version>
+          <version>0.10.0.2.3.99.0-195</version>
       </dependency>
       <dependency>
           <groupId>org.apache.storm</groupId>
           <artifactId>storm-hive</artifactId>
-          <version>0.10.0-SNAPSHOT</version>
+          <version>0.10.0.2.3.99.0-195</version>
       </dependency>
 
       <dependency>
           <groupId>org.apache.kafka</groupId>
           <artifactId>kafka_2.10</artifactId>
-          <version>0.9.0.2.3.99.0-155</version>
+          <version>0.9.0.2.3.99.0-195</version>
           <exclusions>
               <exclusion>
                   <groupId>org.apache.zookeeper</groupId>
