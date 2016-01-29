@@ -1,8 +1,12 @@
 package com.dsinpractice.storm.samples;
 
 import backtype.storm.Config;
+import backtype.storm.ILocalCluster;
 import backtype.storm.LocalCluster;
 import backtype.storm.StormSubmitter;
+import backtype.storm.Testing;
+import backtype.storm.generated.AlreadyAliveException;
+import backtype.storm.generated.InvalidTopologyException;
 import backtype.storm.spout.SchemeAsMultiScheme;
 import backtype.storm.topology.BasicOutputCollector;
 import backtype.storm.topology.IRichSpout;
@@ -12,6 +16,7 @@ import backtype.storm.topology.base.BaseBasicBolt;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Tuple;
 import backtype.storm.tuple.Values;
+import backtype.storm.utils.Utils;
 import org.apache.storm.hive.bolt.HiveBolt;
 import org.apache.storm.hive.bolt.mapper.DelimitedRecordHiveMapper;
 import org.apache.storm.hive.bolt.mapper.HiveMapper;
@@ -71,22 +76,44 @@ public class WordCountTopology {
         Config conf = new Config();
         conf.setDebug(true);
 
-
-        if (args != null && args.length > 0) {
-            conf.setNumWorkers(3);
-
-            StormSubmitter.submitTopology(args[0], conf, builder.createTopology());
+        if (args.length == 0) {
+            System.out.println("Usage: storm jar <jar-file> <name> [enable-hook | cluster]");
+            System.exit(-1);
         }
-        else {
-            conf.setMaxTaskParallelism(3);
 
-            LocalCluster cluster = new LocalCluster();
-            cluster.submitTopology("word-count", conf, builder.createTopology());
-
-            Thread.sleep(600000);
-
-            cluster.shutdown();
+        if (args.length == 1) {
+            submitToLocal(builder, conf, args[0], false);
+        } else {
+            if (args[1].equals("enable-hook")) {
+                conf.putAll(Utils.readDefaultConfig());
+                conf.setDebug(true);
+                submitToLocal(builder, conf, args[0], true);
+            } else {
+                conf.setNumWorkers(3);
+                StormSubmitter.submitTopology(args[0], conf, builder.createTopology());
+            }
         }
+    }
+
+    private static void submitToLocal(TopologyBuilder builder, Config conf, String name, boolean enableHook)
+            throws InterruptedException, AlreadyAliveException, InvalidTopologyException {
+
+        if (enableHook) {
+            conf.put(Config.STORM_TOPOLOGY_SUBMISSION_NOTIFIER_PLUGIN,
+                    "org.apache.atlas.storm.hook.StormAtlasHook");
+        }
+
+        conf.setMaxTaskParallelism(3);
+
+        Map<String,Object> localClusterConf = new HashMap<>();
+        localClusterConf.put("nimbus-daemon", true);
+        ILocalCluster cluster = Testing.getLocalCluster(localClusterConf);
+
+        cluster.submitTopology(name, conf, builder.createTopology());
+
+        Thread.sleep(600000);
+
+        cluster.shutdown();
     }
 
     private static IRichSpout getKafkaSpout() {
