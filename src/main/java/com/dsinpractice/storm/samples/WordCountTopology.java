@@ -1,6 +1,6 @@
 package com.dsinpractice.storm.samples;
 
-/*import backtype.storm.Config;
+import backtype.storm.Config;
 import backtype.storm.ILocalCluster;
 import backtype.storm.LocalCluster;
 import backtype.storm.StormSubmitter;
@@ -16,8 +16,16 @@ import backtype.storm.topology.base.BaseBasicBolt;
 import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Tuple;
 import backtype.storm.tuple.Values;
-import backtype.storm.utils.Utils;*/
-import org.apache.storm.Config;
+import backtype.storm.utils.Utils;
+import org.apache.storm.hive.bolt.HiveBolt;
+import org.apache.storm.hive.bolt.mapper.DelimitedRecordHiveMapper;
+import org.apache.storm.hive.bolt.mapper.HiveMapper;
+import org.apache.storm.hive.common.HiveOptions;
+import storm.kafka.KafkaSpout;
+import storm.kafka.SpoutConfig;
+import storm.kafka.StringScheme;
+import storm.kafka.ZkHosts;
+/*import org.apache.storm.Config;
 import org.apache.storm.ILocalCluster;
 import org.apache.storm.StormSubmitter;
 import org.apache.storm.Testing;
