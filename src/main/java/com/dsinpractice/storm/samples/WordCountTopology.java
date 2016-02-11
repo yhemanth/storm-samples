@@ -17,10 +17,24 @@ import backtype.storm.tuple.Fields;
 import backtype.storm.tuple.Tuple;
 import backtype.storm.tuple.Values;
 import backtype.storm.utils.Utils;
-import org.apache.storm.hive.bolt.HiveBolt;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+import org.apache.storm.hdfs.bolt.HdfsBolt;
+import org.apache.storm.hdfs.bolt.format.DefaultFileNameFormat;
+import org.apache.storm.hdfs.bolt.format.DelimitedRecordFormat;
+import org.apache.storm.hdfs.bolt.format.RecordFormat;
+import org.apache.storm.hdfs.bolt.rotation.FileSizeRotationPolicy;
+import org.apache.storm.hdfs.bolt.sync.CountSyncPolicy;
+import org.apache.storm.hdfs.bolt.sync.SyncPolicy;
+/*import org.apache.storm.hive.bolt.HiveBolt;
 import org.apache.storm.hive.bolt.mapper.DelimitedRecordHiveMapper;
 import org.apache.storm.hive.bolt.mapper.HiveMapper;
-import org.apache.storm.hive.common.HiveOptions;
+import org.apache.storm.hive.common.HiveOptions;*/
 import storm.kafka.KafkaSpout;
 import storm.kafka.SpoutConfig;
 import storm.kafka.StringScheme;
@@ -63,6 +77,12 @@ import java.util.UUID;
  */
 public class WordCountTopology {
 
+    public static final Character HDFS_PATH_SHORT_OPT = 'p';
+    public static final Character TOPIC_NAME_SHORT_OPT = 't';
+    public static final Character TOPOLOGY_NAME_SHORT_OPT = 'n';
+    public static final Character CLUSTER_SHORT_OPT = 'c';
+    public static final Character ENABLE_HOOK_SHORT_OPT = 'k';
+
     public static class WordCount extends BaseBasicBolt {
         Map<String, Integer> counts = new HashMap<String, Integer>();
 
@@ -83,44 +103,82 @@ public class WordCountTopology {
         }
     }
 
+    private static CommandLine parseCommandLineArgs(String[] args) throws ParseException {
+        Options options = configureOptions();
+        if (args.length == 0) {
+            HelpFormatter helpFormatter = new HelpFormatter();
+            helpFormatter.printHelp("storm jar <jarfile> <class> <options>", options);
+            System.exit(-1);
+        }
+        CommandLineParser parser = new DefaultParser();
+        return parser.parse(options, args);
+    }
     public static void main(String[] args) throws Exception {
 
-        TopologyBuilder builder = new TopologyBuilder();
+        CommandLine commandLine = parseCommandLineArgs(args);
 
-        builder.setSpout("kafka-spout", getKafkaSpout(), 1);
-
-        builder.setBolt("split", new JavaSplitSentence(), 1).shuffleGrouping("kafka-spout");
-
-        builder.setBolt("count", new WordCount(), 1).fieldsGrouping("split", new Fields("word"));
-        HiveMapper mapper = new DelimitedRecordHiveMapper()
-                .withColumnFields(new Fields("word", "count"));
-
-        HiveOptions options = new HiveOptions("thrift://localhost:9083", "default", "storm_words_table", mapper)
-                .withBatchSize(1000)
-                .withTxnsPerBatch(100)
-                .withIdleTimeout(10);
-        builder.setBolt("hive-bolt", new HiveBolt(options), 1).shuffleGrouping("count");
+        TopologyBuilder builder = getTopologyBuilder(commandLine);
 
         Config conf = new Config();
         conf.setDebug(true);
 
-        if (args.length == 0) {
-            System.out.println("Usage: storm jar <jar-file> <name> [enable-hook | cluster]");
-            System.exit(-1);
+        String topologyName = "test-topology";
+        if (commandLine.hasOption(TOPOLOGY_NAME_SHORT_OPT)) {
+            topologyName = commandLine.getOptionValue(TOPOLOGY_NAME_SHORT_OPT);
         }
 
-        if (args.length == 1) {
-            submitToLocal(builder, conf, args[0], false);
-        } else {
-            if (args[1].equals("enable-hook")) {
+        if (!commandLine.hasOption(CLUSTER_SHORT_OPT)) {
+            if (commandLine.hasOption(ENABLE_HOOK_SHORT_OPT)) {
                 conf.putAll(Utils.readDefaultConfig());
                 conf.setDebug(true);
-                submitToLocal(builder, conf, args[0], true);
+                submitToLocal(builder, conf, topologyName, true);
             } else {
-                conf.setNumWorkers(3);
-                StormSubmitter.submitTopology(args[0], conf, builder.createTopology());
+                submitToLocal(builder, conf, topologyName, false);
             }
+        } else {
+            conf.setNumWorkers(3);
+            StormSubmitter.submitTopology(commandLine.getOptionValue(TOPOLOGY_NAME_SHORT_OPT), conf,
+                    builder.createTopology());
         }
+    }
+
+    private static TopologyBuilder getTopologyBuilder(CommandLine commandLine) {
+        IRichSpout kafkaSpout = getKafkaSpout(commandLine);
+        HdfsBolt hdfsBolt = getHdfsBolt(commandLine);
+        TopologyBuilder builder = new TopologyBuilder();
+        builder.setSpout("kafka-spout", kafkaSpout, 1);
+        builder.setBolt("split", new JavaSplitSentence(), 1).shuffleGrouping("kafka-spout");
+        builder.setBolt("count", new WordCount(), 1).fieldsGrouping("split", new Fields("word"));
+        builder.setBolt("hdfs-bolt", hdfsBolt, 1).shuffleGrouping("count");
+        return builder;
+    }
+
+    private static HdfsBolt getHdfsBolt(CommandLine commandLine) {
+        RecordFormat recordFormat = new DelimitedRecordFormat().withFieldDelimiter(",");
+        SyncPolicy countSyncPolicy = new CountSyncPolicy(100);
+        FileSizeRotationPolicy fileSizeRotationPolicy = new FileSizeRotationPolicy(5.0f,
+                FileSizeRotationPolicy.Units.MB);
+        String filePath = "/user/storm/files";
+        if (commandLine.hasOption(HDFS_PATH_SHORT_OPT)) {
+            filePath = commandLine.getOptionValue(HDFS_PATH_SHORT_OPT);
+        }
+        DefaultFileNameFormat defaultFileNameFormat = new DefaultFileNameFormat().withPath(filePath);
+
+        return new HdfsBolt().withFsUrl("hdfs://localhost.localdomain:8020").
+                withFileNameFormat(defaultFileNameFormat).
+                withRecordFormat(recordFormat).
+                withSyncPolicy(countSyncPolicy).
+                withRotationPolicy(fileSizeRotationPolicy);
+    }
+
+    private static Options configureOptions() {
+        Options options = new Options();
+        options.addOption(TOPIC_NAME_SHORT_OPT.toString(), "topic", true, "Kafka topic name");
+        options.addOption(HDFS_PATH_SHORT_OPT.toString(), "path", true, "HDFS file path");
+        options.addOption(TOPOLOGY_NAME_SHORT_OPT.toString(), "name", true, "Name of the topology");
+        options.addOption(CLUSTER_SHORT_OPT.toString(), "cluster", true, "Run on cluster if specified");
+        options.addOption(ENABLE_HOOK_SHORT_OPT.toString(), "hook", true, "Enable Storm Atlas Hook if specified");
+        return options;
     }
 
     private static void submitToLocal(TopologyBuilder builder, Config conf, String name, boolean enableHook)
@@ -144,9 +202,12 @@ public class WordCountTopology {
         cluster.shutdown();
     }
 
-    private static IRichSpout getKafkaSpout() {
+    private static IRichSpout getKafkaSpout(CommandLine commandLine) {
         ZkHosts zkHosts = new ZkHosts("localhost:2181");
         String topicName = "test-topic";
+        if (commandLine.hasOption(TOPIC_NAME_SHORT_OPT)) {
+            topicName = commandLine.getOptionValue(TOPIC_NAME_SHORT_OPT);
+        }
         SpoutConfig spoutConfig = new SpoutConfig(zkHosts, topicName, "/" + topicName, UUID.randomUUID().toString());
         spoutConfig.scheme = new SchemeAsMultiScheme(new StringScheme());
         return new KafkaSpout(spoutConfig);
