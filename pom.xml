@@ -44,17 +44,17 @@
     </repositories>
 
   <dependencies>
+      <!-- https://mvnrepository.com/artifact/org.apache.storm/storm-core -->
       <dependency>
           <groupId>org.apache.storm</groupId>
           <artifactId>storm-core</artifactId>
-          <version>0.10.0.2.3.99.0-195</version>
-          <!-- keep storm out of the jar-with-dependencies -->
+          <version>1.0.1</version>
           <scope>provided</scope>
       </dependency>
       <dependency>
           <groupId>org.apache.storm</groupId>
           <artifactId>storm-kafka</artifactId>
-          <version>0.10.0.2.3.99.0-195</version>
+          <version>1.0.1</version>
       </dependency>
       <!--dependency>
           <groupId>org.apache.storm</groupId>
@@ -64,7 +64,13 @@
       <dependency>
           <groupId>org.apache.storm</groupId>
           <artifactId>storm-hdfs</artifactId>
-          <version>0.10.0.2.3.99.0-195</version>
+          <version>1.0.1</version>
+      </dependency>
+      <!-- https://mvnrepository.com/artifact/org.apache.htrace/htrace-core -->
+      <dependency>
+          <groupId>org.apache.htrace</groupId>
+          <artifactId>htrace-core</artifactId>
+          <version>3.1.0-incubating</version>
       </dependency>
       <dependency>
           <groupId>commons-cli</groupId>
@@ -74,7 +80,7 @@
       <dependency>
           <groupId>org.apache.kafka</groupId>
           <artifactId>kafka_2.10</artifactId>
-          <version>0.9.0.2.3.99.0-195</version>
+          <version>0.10.0.0</version>
           <exclusions>
               <exclusion>
                   <groupId>org.apache.zookeeper</groupId>
